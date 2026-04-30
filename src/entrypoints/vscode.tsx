@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { SpecEditorApp } from '../adapters/spec-editor-app'
 import { VSCodeStorageAdapter } from '../adapters/vscode-storage-adapter'
-import App from '../App'
 import type { VSCodeFsPort } from '../core/storage/storage-adapter'
 import 'react-data-grid/lib/styles.css'
 import '../index.css'
@@ -16,7 +16,7 @@ export function mountVSCodeApp({ target, fsPort, storageKey }: MountVSCodeAppPar
   const storageAdapter = new VSCodeStorageAdapter(fsPort)
   createRoot(target).render(
     <StrictMode>
-      <App storageAdapter={storageAdapter} storageKey={storageKey} />
+      <SpecEditorApp storageAdapter={storageAdapter} storageKey={storageKey} />
     </StrictMode>,
   )
 }

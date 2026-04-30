@@ -1,4 +1,6 @@
-export type YellowtailRow = Record<string, string>
+import type { SpecRow } from './models/spec-table'
+
+export type YellowtailRow = SpecRow
 
 function normalizeLines(markdown: string): string[] {
   return markdown
