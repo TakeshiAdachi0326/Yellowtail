@@ -1,3 +1,27 @@
+# Yellowtail (WIP)
+
+Excelベースのソフトウェア仕様書管理を楽にしたい。
+
+## 🚀 Concept
+現場（SES/SIer）で蔓延する「バイナリ形式の仕様書管理（Excel/Word）」による、SVNやフォルダ管理でのコンフリクトや差分確認の困難さを解決するためのデスクトップツールです。
+
+- **Git/SVN Friendly**: 実体はMarkdown（.spec）として保存し、差分を可視化。
+- **High Performance**: 疎行列（Sparse Matrix）データ構造により、巨大な仕様書も軽量に動作。
+- **Universal Architecture**: コアロジックをUIから完全に分離し、Tauri/VS Code Extensionなど多展開を想定。
+
+## 🛠️ Tech Stack
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **Desktop Engine**: Tauri (Rust)
+- **Data Structure**: Sparse Matrix (Core TS)
+
+## 📅 Roadmap
+- [ ] Core Engine: 疎行列データ構造の実装
+- [ ] Parser: Markdown ↔ JSON 相互変換
+- [ ] UI: 無限スクロール対応の仕様書エディタ
+- [ ] Integration: SVN/Git コンフリクト解消支援機能
+
+
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
