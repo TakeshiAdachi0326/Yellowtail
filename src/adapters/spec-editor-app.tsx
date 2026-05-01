@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import App from '../App'
+import {
+  SPEC_GRID_DISPLAY_COLS,
+  cellMapToYellowtailRows,
+  padColumnHeaders,
+  yellowtailRowsToCellMap,
+} from '../core/cell-map'
 import type { StorageAdapter } from '../core/storage/storage-adapter'
 import {
   parseMarkdownTableToJson,
@@ -27,8 +33,25 @@ export function SpecEditorApp({
   storageKey = DEFAULT_SPEC_STORAGE_KEY,
 }: SpecEditorAppProps) {
   const fallbackRows = useMemo(() => parseMarkdownTableToJson(SAMPLE_SPEC_MARKDOWN), [])
-  const [rows, setRows] = useState<YellowtailRow[]>(fallbackRows)
+
+  const seeded = useMemo(() => {
+    const headers = padColumnHeaders(Object.keys(fallbackRows[0] ?? {}), SPEC_GRID_DISPLAY_COLS)
+    return {
+      headers,
+      cells: yellowtailRowsToCellMap(fallbackRows, headers),
+    }
+  }, [fallbackRows])
+
+  const [columnHeaders, setColumnHeaders] = useState<string[]>(() => seeded.headers)
+
+  const [cellData, setCellData] = useState<Map<string, string>>(() => seeded.cells)
+
   const [saveMessage, setSaveMessage] = useState<string>('')
+
+  const rowsForExport = useMemo(
+    () => cellMapToYellowtailRows(cellData, columnHeaders),
+    [cellData, columnHeaders],
+  )
 
   useEffect(() => {
     const load = async () => {
@@ -39,21 +62,24 @@ export function SpecEditorApp({
 
       const restoredRows = parseMarkdownTableToJson(savedSpec)
       if (restoredRows.length > 0) {
-        setRows(restoredRows)
+        const keys = Object.keys(restoredRows[0])
+        const padded = padColumnHeaders(keys, SPEC_GRID_DISPLAY_COLS)
+        setColumnHeaders(padded)
+        setCellData(yellowtailRowsToCellMap(restoredRows, padded))
       }
     }
 
     void load()
   }, [storageAdapter, storageKey])
 
-  const handleRowsChange = (nextRows: YellowtailRow[]) => {
-    setRows(nextRows)
+  const handleCellDataChange = (next: Map<string, string>) => {
+    setCellData(next)
     setSaveMessage('')
   }
 
   const handleSave = () => {
     void (async () => {
-      const markdown = stringifyJsonToMarkdownTable(rows)
+      const markdown = stringifyJsonToMarkdownTable(rowsForExport)
       if (!markdown.trim()) {
         setSaveMessage('保存対象のデータがありません。')
         return
@@ -66,10 +92,12 @@ export function SpecEditorApp({
 
   return (
     <App
-      rows={rows}
+      columnHeaders={columnHeaders}
+      cellData={cellData}
+      rowsForExport={rowsForExport}
       saveMessage={saveMessage}
       storageEnvironment={storageAdapter.environment}
-      onRowsChange={handleRowsChange}
+      onCellDataChange={handleCellDataChange}
       onSave={handleSave}
     />
   )

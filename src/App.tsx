@@ -3,14 +3,24 @@ import { SpecEditor } from './components/SpecEditor'
 import { stringifyJsonToMarkdownTable, type YellowtailRow } from './core/yellowtail-engine'
 
 type AppProps = {
-  rows: YellowtailRow[]
+  columnHeaders: string[]
+  cellData: Map<string, string>
+  rowsForExport: YellowtailRow[]
   saveMessage: string
   storageEnvironment: string
-  onRowsChange: (nextRows: YellowtailRow[]) => void
+  onCellDataChange: (next: Map<string, string>) => void
   onSave: () => void
 }
 
-function App({ rows, saveMessage, storageEnvironment, onRowsChange, onSave }: AppProps) {
+function App({
+  columnHeaders,
+  cellData,
+  rowsForExport,
+  saveMessage,
+  storageEnvironment,
+  onCellDataChange,
+  onSave,
+}: AppProps) {
   return (
     <main style={{ padding: '24px', display: 'grid', gap: '16px' }}>
       <h1>Yellowtail Spec Editor</h1>
@@ -18,8 +28,12 @@ function App({ rows, saveMessage, storageEnvironment, onRowsChange, onSave }: Ap
         UIは表示に専念し、保存はアダプタ層を経由します（現在: {storageEnvironment}）。
       </p>
 
-      <div style={{ height: 320 }}>
-        <SpecEditor initialRows={rows} onRowsChange={onRowsChange} />
+      <div style={{ height: 480 }}>
+        <SpecEditor
+          columnHeaders={columnHeaders}
+          data={cellData}
+          onCellDataChange={onCellDataChange}
+        />
       </div>
 
       <section>
@@ -30,12 +44,16 @@ function App({ rows, saveMessage, storageEnvironment, onRowsChange, onSave }: Ap
       </section>
 
       <section>
-        <h2>JSON Preview</h2>
-        <pre>{JSON.stringify(rows, null, 2)}</pre>
+        <h2>Sparse cell map (preview)</h2>
+        <pre>{JSON.stringify(Object.fromEntries(cellData), null, 2)}</pre>
+      </section>
+      <section>
+        <h2>JSON Preview (exported rows)</h2>
+        <pre>{JSON.stringify(rowsForExport, null, 2)}</pre>
       </section>
       <section>
         <h2>Markdown Preview</h2>
-        <pre>{stringifyJsonToMarkdownTable(rows)}</pre>
+        <pre>{stringifyJsonToMarkdownTable(rowsForExport)}</pre>
       </section>
     </main>
   )
