@@ -4,6 +4,7 @@ Excelベースのソフトウェア仕様書管理を楽にしたい。
 
 ## 🚀 Concept
 現場（SES/SIer）で蔓延する「バイナリ形式の仕様書管理（Excel/Word）」による、SVNやフォルダ管理でのコンフリクトや差分確認の困難さを解決するためのデスクトップツールです。
+サンプル：https://yellowtail-nine.vercel.app/
 
 - **Git/SVN Friendly**: 実体はMarkdown（.spec）として保存し、差分を可視化。
 - **High Performance**: 疎行列（Sparse Matrix）データ構造により、巨大な仕様書も軽量に動作。
