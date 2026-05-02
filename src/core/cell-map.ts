@@ -105,10 +105,17 @@ export function cellMapToYellowtailRows(
   const rows: YellowtailRow[] = []
   for (let r = 0; r <= maxRow; r += 1) {
     const row: YellowtailRow = {}
+    let hasContent = false
     for (let c = 0; c < headers.length; c += 1) {
-      row[headers[c]] = data.get(makeCellKey(r, c)) ?? ''
+      const value = data.get(makeCellKey(r, c)) ?? ''
+      row[headers[c]] = value
+      if (String(value).trim() !== '') {
+        hasContent = true
+      }
     }
-    rows.push(row)
+    if (hasContent) {
+      rows.push(row)
+    }
   }
   return rows
 }
