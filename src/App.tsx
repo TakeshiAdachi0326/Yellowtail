@@ -38,30 +38,15 @@ function App({
   onSave,
 }: AppProps) {
   return (
-    <main
-      style={{
-        padding: '24px',
-        display: 'grid',
-        gap: '16px',
-        minWidth: 0,
-        width: '100%',
-        boxSizing: 'border-box',
-      }}
-    >
-      <h1>Yellowtail Spec Editor</h1>
-      <p>
-        UIは表示に専念し、保存はアダプタ層を経由します（現在: {storageEnvironment}）。
-      </p>
+    <main className="app-shell">
+      <div className="app-shell__intro">
+        <h1>Yellowtail Spec Editor</h1>
+        <p>
+          UIは表示に専念し、保存はアダプタ層を経由します（現在: {storageEnvironment}）。
+        </p>
+      </div>
 
-      <div
-        style={{
-          height: 480,
-          width: '100%',
-          maxWidth: '100%',
-          minWidth: 0,
-          boxSizing: 'border-box',
-        }}
-      >
+      <div className="spec-grid-fixed-frame">
         <SpecEditor
           columnHeaders={columnHeaders}
           data={cellData}
@@ -77,25 +62,27 @@ function App({
         />
       </div>
 
-      <section>
-        <button type="button" onClick={onSave}>
-          保存（StorageAdapter経由）
-        </button>
-        {saveMessage ? <p>{saveMessage}</p> : null}
-      </section>
+      <div className="app-shell__meta">
+        <section>
+          <button type="button" onClick={onSave}>
+            保存（StorageAdapter経由）
+          </button>
+          {saveMessage ? <p>{saveMessage}</p> : null}
+        </section>
 
-      <section>
-        <h2>Sparse cell map (preview)</h2>
-        <pre>{JSON.stringify(Object.fromEntries(cellData), null, 2)}</pre>
-      </section>
-      <section>
-        <h2>JSON Preview (exported rows)</h2>
-        <pre>{JSON.stringify(rowsForExport, null, 2)}</pre>
-      </section>
-      <section>
-        <h2>Markdown Preview</h2>
-        <pre>{stringifyJsonToMarkdownTable(rowsForExport)}</pre>
-      </section>
+        <section>
+          <h2>Sparse cell map (preview)</h2>
+          <pre>{JSON.stringify(Object.fromEntries(cellData), null, 2)}</pre>
+        </section>
+        <section>
+          <h2>JSON Preview (exported rows)</h2>
+          <pre>{JSON.stringify(rowsForExport, null, 2)}</pre>
+        </section>
+        <section>
+          <h2>Markdown Preview</h2>
+          <pre>{stringifyJsonToMarkdownTable(rowsForExport)}</pre>
+        </section>
+      </div>
     </main>
   )
 }

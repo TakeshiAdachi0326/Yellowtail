@@ -1,3 +1,69 @@
+/*
+ * App fills viewport (#root); document/body do not scroll — only regions inside .app-shell scroll.
+ */
+.app-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 24px;
+  box-sizing: border-box;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.app-shell__intro {
+  flex-shrink: 0;
+}
+
+/* Leave vertical space for the grid (global h1 has large margins) */
+.app-shell__intro h1 {
+  margin: 0 0 8px;
+  font-size: clamp(28px, 4.5vw, 40px);
+  letter-spacing: -0.6px;
+}
+
+.app-shell__intro p {
+  margin: 0;
+}
+
+/*
+ * Grid fills remaining height; react-data-grid is the only horizontal/vertical scroll for the sheet.
+ * contain: strict keeps wide grids from widening the page.
+ */
+.spec-grid-fixed-frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  contain: strict;
+}
+
+/* Save + previews: scroll inside this panel only (no body scroll) */
+.app-shell__meta {
+  flex: 0 1 auto;
+  max-height: min(280px, 32vh);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  text-align: left;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-shell__meta section {
+  margin-bottom: 12px;
+}
+
+.app-shell__meta section:last-child {
+  margin-bottom: 0;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

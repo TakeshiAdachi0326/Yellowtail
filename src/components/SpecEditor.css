@@ -1,12 +1,14 @@
 /*
- * Viewport clips to parent size so react-data-grid can scroll (overflow: auto on RDG root)
- * and virtualize rows/columns — only cells near the viewport are rendered.
+ * Fills the fixed frame from App; overflow hidden keeps sizing bounded so RDG handles scrollbars.
+ * Row header column uses frozen:true; column letters use RDG sticky header cells.
  */
 .spec-editor-viewport {
   height: 100%;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -14,7 +16,8 @@
   width: 100% !important;
   height: 100% !important;
   min-width: 0 !important;
-  max-width: 100%;
+  max-width: 100% !important;
+  max-height: 100% !important;
   box-sizing: border-box;
 }
 
