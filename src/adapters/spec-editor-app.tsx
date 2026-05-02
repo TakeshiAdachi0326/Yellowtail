@@ -10,7 +10,6 @@ import type { StorageAdapter } from '../core/storage/storage-adapter'
 import {
   parseMarkdownTableToJson,
   stringifyJsonToMarkdownTable,
-  type YellowtailRow,
 } from '../core/yellowtail-engine'
 
 const SAMPLE_SPEC_MARKDOWN = `
@@ -46,6 +45,10 @@ export function SpecEditorApp({
 
   const [cellData, setCellData] = useState<Map<string, string>>(() => seeded.cells)
 
+  const [colWidths, setColWidths] = useState<Map<number, number>>(() => new Map())
+
+  const [rowHeights, setRowHeights] = useState<Map<number, number>>(() => new Map())
+
   const [saveMessage, setSaveMessage] = useState<string>('')
 
   const rowsForExport = useMemo(
@@ -77,6 +80,19 @@ export function SpecEditorApp({
     setSaveMessage('')
   }
 
+  const handleColWidthsChange = (next: Map<number, number>) => {
+    setColWidths(next)
+  }
+
+  const handleRowHeightChange = (rowIndex: number, heightPx: number) => {
+    setRowHeights((prev) => {
+      const next = new Map(prev)
+      next.set(rowIndex, heightPx)
+      return next
+    })
+    setSaveMessage('')
+  }
+
   const handleSave = () => {
     void (async () => {
       const markdown = stringifyJsonToMarkdownTable(rowsForExport)
@@ -94,10 +110,14 @@ export function SpecEditorApp({
     <App
       columnHeaders={columnHeaders}
       cellData={cellData}
+      colWidths={colWidths}
+      rowHeights={rowHeights}
       rowsForExport={rowsForExport}
       saveMessage={saveMessage}
       storageEnvironment={storageAdapter.environment}
       onCellDataChange={handleCellDataChange}
+      onColWidthsChange={handleColWidthsChange}
+      onRowHeightChange={handleRowHeightChange}
       onSave={handleSave}
     />
   )

@@ -5,20 +5,28 @@ import { stringifyJsonToMarkdownTable, type YellowtailRow } from './core/yellowt
 type AppProps = {
   columnHeaders: string[]
   cellData: Map<string, string>
+  colWidths: Map<number, number>
+  rowHeights: Map<number, number>
   rowsForExport: YellowtailRow[]
   saveMessage: string
   storageEnvironment: string
   onCellDataChange: (next: Map<string, string>) => void
+  onColWidthsChange: (next: Map<number, number>) => void
+  onRowHeightChange: (rowIndex: number, heightPx: number) => void
   onSave: () => void
 }
 
 function App({
   columnHeaders,
   cellData,
+  colWidths,
+  rowHeights,
   rowsForExport,
   saveMessage,
   storageEnvironment,
   onCellDataChange,
+  onColWidthsChange,
+  onRowHeightChange,
   onSave,
 }: AppProps) {
   return (
@@ -32,7 +40,11 @@ function App({
         <SpecEditor
           columnHeaders={columnHeaders}
           data={cellData}
+          colWidths={colWidths}
+          rowHeights={rowHeights}
           onCellDataChange={onCellDataChange}
+          onColWidthsChange={onColWidthsChange}
+          onRowHeightChange={onRowHeightChange}
         />
       </div>
 

@@ -4,6 +4,18 @@ import type { YellowtailRow } from './yellowtail-engine'
 export const SPEC_GRID_DISPLAY_ROWS = 100
 export const SPEC_GRID_DISPLAY_COLS = 20
 
+/** Default pixel size when `colWidths` / `rowHeights` has no entry for that index. */
+export const DEFAULT_WIDTH = 100
+export const DEFAULT_HEIGHT = 25
+
+/** Minimum row height when dragging row boundaries (px). */
+export const MIN_ROW_HEIGHT = 18
+
+/**
+ * Key for the row-header column (`#`) inside `colWidths`. Data columns use `0..SPEC_GRID_DISPLAY_COLS - 1`.
+ */
+export const GRID_ROW_HEADER_COL_KEY = -1
+
 export function makeCellKey(row: number, col: number): string {
   return `${row}-${col}`
 }

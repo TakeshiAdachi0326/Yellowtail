@@ -1,0 +1,18 @@
+/* react-data-grid: widen column resize hit area at header boundaries */
+.fill-grid [class*='rdg-resize-handle'] {
+  inline-size: 16px;
+  z-index: 4;
+}
+
+/* Row height: drag handle under row-number cell (Excel-like) */
+.spec-row-resize-handle {
+  flex-shrink: 0;
+  height: 6px;
+  margin-block-end: -3px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.spec-row-resize-handle:hover {
+  background-color: color-mix(in srgb, var(--rdg-selection-color, hsl(207 100% 50%)) 35%, transparent);
+}
