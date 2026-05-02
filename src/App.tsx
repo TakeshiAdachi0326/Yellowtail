@@ -5,6 +5,8 @@ import { stringifyJsonToMarkdownTable, type YellowtailRow } from './core/yellowt
 type AppProps = {
   columnHeaders: string[]
   cellData: Map<string, string>
+  displayRowCount: number
+  displayColCount: number
   colWidths: Map<number, number>
   rowHeights: Map<number, number>
   rowsForExport: YellowtailRow[]
@@ -12,6 +14,8 @@ type AppProps = {
   storageEnvironment: string
   onCellDataChange: (next: Map<string, string>) => void
   onColWidthsChange: (next: Map<number, number>) => void
+  onExpandNearBottom: () => void
+  onExpandNearRight: () => void
   onRowHeightChange: (rowIndex: number, heightPx: number) => void
   onSave: () => void
 }
@@ -19,6 +23,8 @@ type AppProps = {
 function App({
   columnHeaders,
   cellData,
+  displayRowCount,
+  displayColCount,
   colWidths,
   rowHeights,
   rowsForExport,
@@ -26,24 +32,47 @@ function App({
   storageEnvironment,
   onCellDataChange,
   onColWidthsChange,
+  onExpandNearBottom,
+  onExpandNearRight,
   onRowHeightChange,
   onSave,
 }: AppProps) {
   return (
-    <main style={{ padding: '24px', display: 'grid', gap: '16px' }}>
+    <main
+      style={{
+        padding: '24px',
+        display: 'grid',
+        gap: '16px',
+        minWidth: 0,
+        width: '100%',
+        boxSizing: 'border-box',
+      }}
+    >
       <h1>Yellowtail Spec Editor</h1>
       <p>
         UIは表示に専念し、保存はアダプタ層を経由します（現在: {storageEnvironment}）。
       </p>
 
-      <div style={{ height: 480 }}>
+      <div
+        style={{
+          height: 480,
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+          boxSizing: 'border-box',
+        }}
+      >
         <SpecEditor
           columnHeaders={columnHeaders}
           data={cellData}
+          displayRowCount={displayRowCount}
+          displayColCount={displayColCount}
           colWidths={colWidths}
           rowHeights={rowHeights}
           onCellDataChange={onCellDataChange}
           onColWidthsChange={onColWidthsChange}
+          onExpandNearBottom={onExpandNearBottom}
+          onExpandNearRight={onExpandNearRight}
           onRowHeightChange={onRowHeightChange}
         />
       </div>

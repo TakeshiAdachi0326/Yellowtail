@@ -1,8 +1,20 @@
 import type { YellowtailRow } from './yellowtail-engine'
 
-/** Fixed viewport for sparse grid (Step 1). */
-export const SPEC_GRID_DISPLAY_ROWS = 100
-export const SPEC_GRID_DISPLAY_COLS = 20
+/** Initial rows/cols before user scrolls to expand (spreadsheet-style growth). */
+export const INITIAL_GRID_ROWS = 100
+export const INITIAL_GRID_COLS = 20
+
+/** How many rows/cols to append when scrolling near the bottom/right edge. */
+export const GRID_EXPAND_ROW_CHUNK = 50
+export const GRID_EXPAND_COL_CHUNK = 10
+
+/** Distance from scroll edge (px) that triggers expansion. */
+export const GRID_EXPAND_EDGE_PX = 72
+
+/** @deprecated Use INITIAL_GRID_ROWS */
+export const SPEC_GRID_DISPLAY_ROWS = INITIAL_GRID_ROWS
+/** @deprecated Use INITIAL_GRID_COLS */
+export const SPEC_GRID_DISPLAY_COLS = INITIAL_GRID_COLS
 
 /** Default pixel size when `colWidths` / `rowHeights` has no entry for that index. */
 export const DEFAULT_WIDTH = 100
@@ -12,9 +24,28 @@ export const DEFAULT_HEIGHT = 25
 export const MIN_ROW_HEIGHT = 18
 
 /**
- * Key for the row-header column (`#`) inside `colWidths`. Data columns use `0..SPEC_GRID_DISPLAY_COLS - 1`.
+ * Key for the row-header column (`#`) inside `colWidths`. Data columns use `0..(columnCount-1)`.
  */
 export const GRID_ROW_HEADER_COL_KEY = -1
+
+/** Parse sparse keys to infer max row/col indices (for sizing grid after load). */
+export function inferExtentsFromCellMap(data: Map<string, string>): {
+  maxRow: number
+  maxCol: number
+} {
+  let maxRow = -1
+  let maxCol = -1
+  for (const key of data.keys()) {
+    const sep = key.indexOf('-')
+    if (sep <= 0) continue
+    const r = Number(key.slice(0, sep))
+    const c = Number(key.slice(sep + 1))
+    if (!Number.isInteger(r) || !Number.isInteger(c)) continue
+    maxRow = Math.max(maxRow, r)
+    maxCol = Math.max(maxCol, c)
+  }
+  return { maxRow, maxCol }
+}
 
 export function makeCellKey(row: number, col: number): string {
   return `${row}-${col}`

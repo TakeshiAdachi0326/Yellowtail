@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import App from '../App'
 import {
-  SPEC_GRID_DISPLAY_COLS,
+  GRID_EXPAND_COL_CHUNK,
+  GRID_EXPAND_ROW_CHUNK,
+  INITIAL_GRID_COLS,
+  INITIAL_GRID_ROWS,
   cellMapToYellowtailRows,
+  inferExtentsFromCellMap,
   padColumnHeaders,
   yellowtailRowsToCellMap,
 } from '../core/cell-map'
@@ -34,7 +38,7 @@ export function SpecEditorApp({
   const fallbackRows = useMemo(() => parseMarkdownTableToJson(SAMPLE_SPEC_MARKDOWN), [])
 
   const seeded = useMemo(() => {
-    const headers = padColumnHeaders(Object.keys(fallbackRows[0] ?? {}), SPEC_GRID_DISPLAY_COLS)
+    const headers = padColumnHeaders(Object.keys(fallbackRows[0] ?? {}), INITIAL_GRID_COLS)
     return {
       headers,
       cells: yellowtailRowsToCellMap(fallbackRows, headers),
@@ -44,6 +48,10 @@ export function SpecEditorApp({
   const [columnHeaders, setColumnHeaders] = useState<string[]>(() => seeded.headers)
 
   const [cellData, setCellData] = useState<Map<string, string>>(() => seeded.cells)
+
+  const [gridRowCount, setGridRowCount] = useState(INITIAL_GRID_ROWS)
+
+  const [gridColCount, setGridColCount] = useState(INITIAL_GRID_COLS)
 
   const [colWidths, setColWidths] = useState<Map<number, number>>(() => new Map())
 
@@ -66,8 +74,15 @@ export function SpecEditorApp({
       const restoredRows = parseMarkdownTableToJson(savedSpec)
       if (restoredRows.length > 0) {
         const keys = Object.keys(restoredRows[0])
-        const padded = padColumnHeaders(keys, SPEC_GRID_DISPLAY_COLS)
+        const draftHeaders = padColumnHeaders(keys, keys.length)
+        const draftCells = yellowtailRowsToCellMap(restoredRows, draftHeaders)
+        const ext = inferExtentsFromCellMap(draftCells)
+        const colCount = Math.max(INITIAL_GRID_COLS, keys.length, ext.maxCol + 1)
+        const rowCount = Math.max(INITIAL_GRID_ROWS, restoredRows.length, ext.maxRow + 1)
+        const padded = padColumnHeaders(keys, colCount)
         setColumnHeaders(padded)
+        setGridColCount(colCount)
+        setGridRowCount(rowCount)
         setCellData(yellowtailRowsToCellMap(restoredRows, padded))
       }
     }
@@ -82,6 +97,18 @@ export function SpecEditorApp({
 
   const handleColWidthsChange = (next: Map<number, number>) => {
     setColWidths(next)
+  }
+
+  const handleExpandNearRight = () => {
+    setGridColCount((prev) => {
+      const next = prev + GRID_EXPAND_COL_CHUNK
+      setColumnHeaders((h) => padColumnHeaders(h, next))
+      return next
+    })
+  }
+
+  const handleExpandNearBottom = () => {
+    setGridRowCount((n) => n + GRID_EXPAND_ROW_CHUNK)
   }
 
   const handleRowHeightChange = (rowIndex: number, heightPx: number) => {
@@ -110,6 +137,8 @@ export function SpecEditorApp({
     <App
       columnHeaders={columnHeaders}
       cellData={cellData}
+      displayRowCount={gridRowCount}
+      displayColCount={gridColCount}
       colWidths={colWidths}
       rowHeights={rowHeights}
       rowsForExport={rowsForExport}
@@ -117,6 +146,8 @@ export function SpecEditorApp({
       storageEnvironment={storageAdapter.environment}
       onCellDataChange={handleCellDataChange}
       onColWidthsChange={handleColWidthsChange}
+      onExpandNearBottom={handleExpandNearBottom}
+      onExpandNearRight={handleExpandNearRight}
       onRowHeightChange={handleRowHeightChange}
       onSave={handleSave}
     />

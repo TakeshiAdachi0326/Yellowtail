@@ -1,4 +1,11 @@
-import { type MouseEvent, type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef } from 'react'
+import {
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type UIEvent,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react'
 import {
   DataGrid,
   renderTextEditor,
@@ -12,28 +19,27 @@ import type { YellowtailRow } from '../core/yellowtail-engine'
 import {
   DEFAULT_HEIGHT,
   DEFAULT_WIDTH,
+  GRID_EXPAND_EDGE_PX,
   GRID_ROW_HEADER_COL_KEY,
   MIN_ROW_HEIGHT,
-  SPEC_GRID_DISPLAY_COLS,
-  SPEC_GRID_DISPLAY_ROWS,
   makeCellKey,
 } from '../core/cell-map'
 
 type SpecEditorProps = {
   columnHeaders: string[]
   data: Map<string, string>
+  displayRowCount: number
+  displayColCount: number
   colWidths: Map<number, number>
   rowHeights: Map<number, number>
   onCellDataChange?: (next: Map<string, string>) => void
   onColWidthsChange?: (next: Map<number, number>) => void
+  onExpandNearBottom?: () => void
+  onExpandNearRight?: () => void
   onRowHeightChange?: (rowIndex: number, heightPx: number) => void
 }
 
 type GridRow = YellowtailRow & { __rowNumber: string }
-
-/** Fixed grid size for sparse rendering (not derived from data length). */
-const displayRows = SPEC_GRID_DISPLAY_ROWS
-const displayCols = SPEC_GRID_DISPLAY_COLS
 
 function toExcelColumnName(index: number): string {
   let current = index
@@ -52,13 +58,14 @@ const ROW_NUMBER_KEY = '__rowNumber' as const
 function buildRdgColumnWidths(
   colWidths: Map<number, number>,
   headers: string[],
+  displayColCount: number,
 ): Map<string, { type: 'resized'; width: number }> {
   const m = new Map<string, { type: 'resized'; width: number }>()
   m.set(ROW_NUMBER_KEY, {
     type: 'resized',
     width: colWidths.get(GRID_ROW_HEADER_COL_KEY) ?? DEFAULT_WIDTH,
   })
-  headers.slice(0, displayCols).forEach((h, i) => {
+  headers.slice(0, displayColCount).forEach((h, i) => {
     m.set(h, { type: 'resized', width: colWidths.get(i) ?? DEFAULT_WIDTH })
   })
   return m
@@ -67,13 +74,14 @@ function buildRdgColumnWidths(
 function columnWidthsToColWidths(
   cw: ColumnWidths,
   headers: string[],
+  displayColCount: number,
 ): Map<number, number> {
   const next = new Map<number, number>()
   const rowEntry = cw.get(ROW_NUMBER_KEY)
   if (rowEntry !== undefined && typeof rowEntry.width === 'number') {
     next.set(GRID_ROW_HEADER_COL_KEY, rowEntry.width)
   }
-  headers.slice(0, displayCols).forEach((h, i) => {
+  headers.slice(0, displayColCount).forEach((h, i) => {
     const entry = cw.get(h)
     if (entry !== undefined && typeof entry.width === 'number') {
       next.set(i, entry.width)
@@ -82,16 +90,52 @@ function columnWidthsToColWidths(
   return next
 }
 
+const GRID_EXPAND_SCROLL_THROTTLE_MS = 280
+
 export function SpecEditor({
   columnHeaders,
   data,
+  displayRowCount,
+  displayColCount,
   colWidths,
   rowHeights,
   onCellDataChange,
   onColWidthsChange,
+  onExpandNearBottom,
+  onExpandNearRight,
   onRowHeightChange,
 }: SpecEditorProps) {
   const headers = columnHeaders
+
+  const expandThrottleRef = useRef({ bottom: 0, right: 0 })
+
+  const handleGridScroll = useCallback(
+    (event: UIEvent<HTMLDivElement>) => {
+      const el = event.currentTarget
+      const { scrollLeft, scrollTop, clientWidth, clientHeight, scrollWidth, scrollHeight } = el
+      const edge = GRID_EXPAND_EDGE_PX
+      const now = performance.now()
+
+      if (
+        scrollWidth - clientWidth > 2 &&
+        scrollLeft + clientWidth >= scrollWidth - edge &&
+        now - expandThrottleRef.current.right >= GRID_EXPAND_SCROLL_THROTTLE_MS
+      ) {
+        expandThrottleRef.current.right = now
+        onExpandNearRight?.()
+      }
+
+      if (
+        scrollHeight - clientHeight > 2 &&
+        scrollTop + clientHeight >= scrollHeight - edge &&
+        now - expandThrottleRef.current.bottom >= GRID_EXPAND_SCROLL_THROTTLE_MS
+      ) {
+        expandThrottleRef.current.bottom = now
+        onExpandNearBottom?.()
+      }
+    },
+    [onExpandNearBottom, onExpandNearRight],
+  )
 
   const rowResizeDragRef = useRef<{ startY: number; startH: number; rowIdx: number } | null>(null)
 
@@ -134,18 +178,18 @@ export function SpecEditor({
   }, [])
 
   const rdgColumnWidths = useMemo(
-    () => buildRdgColumnWidths(colWidths, headers),
-    [colWidths, headers],
+    () => buildRdgColumnWidths(colWidths, headers, displayColCount),
+    [colWidths, headers, displayColCount],
   )
 
   const handleColumnWidthsChange = useCallback(
     (next: ColumnWidths) => {
-      const extracted = columnWidthsToColWidths(next, headers)
+      const extracted = columnWidthsToColWidths(next, headers, displayColCount)
       const merged = new Map(colWidths)
       extracted.forEach((w, k) => merged.set(k, w))
       onColWidthsChange?.(merged)
     },
-    [colWidths, headers, onColWidthsChange],
+    [colWidths, headers, displayColCount, onColWidthsChange],
   )
 
   const columns = useMemo<Column<GridRow>[]>(() => {
@@ -209,7 +253,7 @@ export function SpecEditor({
       },
     }
 
-    const editableColumns = headers.slice(0, displayCols).map((header, index) => ({
+    const editableColumns = headers.slice(0, displayColCount).map((header, index) => ({
       key: header,
       name: toExcelColumnName(index),
       editable: true,
@@ -225,6 +269,7 @@ export function SpecEditor({
   }, [
     headers,
     colWidths,
+    displayColCount,
     handleRowResizePointerDown,
     handleRowResizePointerMove,
     endRowResize,
@@ -232,9 +277,9 @@ export function SpecEditor({
 
   const gridRows = useMemo<GridRow[]>(() => {
     const rows: GridRow[] = []
-    const effectiveHeaders = headers.slice(0, displayCols)
+    const effectiveHeaders = headers.slice(0, displayColCount)
 
-    for (let r = 0; r < displayRows; r += 1) {
+    for (let r = 0; r < displayRowCount; r += 1) {
       const row: GridRow = { __rowNumber: String(r + 1) }
       for (let c = 0; c < effectiveHeaders.length; c += 1) {
         const key = effectiveHeaders[c]
@@ -244,13 +289,13 @@ export function SpecEditor({
     }
 
     return rows
-  }, [data, headers])
+  }, [data, headers, displayRowCount, displayColCount])
 
   const handleRowsChange = (nextRows: GridRow[]) => {
     const next = new Map(data)
-    const effectiveHeaders = headers.slice(0, displayCols)
+    const effectiveHeaders = headers.slice(0, displayColCount)
 
-    for (let r = 0; r < displayRows; r += 1) {
+    for (let r = 0; r < displayRowCount; r += 1) {
       const row = nextRows[r]
       if (!row) {
         continue
@@ -294,16 +339,22 @@ export function SpecEditor({
   }
 
   return (
-    <DataGrid
-      columns={columns}
-      rows={gridRows}
-      columnWidths={rdgColumnWidths}
-      onColumnWidthsChange={handleColumnWidthsChange}
-      rowHeight={rowHeightForRow}
-      headerRowHeight={DEFAULT_HEIGHT}
-      onRowsChange={handleRowsChange}
-      onCellClick={handleCellClick}
-      className="fill-grid"
-    />
+    <div className="spec-editor-viewport">
+      <DataGrid
+        columns={columns}
+        rows={gridRows}
+        rowKeyGetter={(row) => row.__rowNumber}
+        columnWidths={rdgColumnWidths}
+        onColumnWidthsChange={handleColumnWidthsChange}
+        rowHeight={rowHeightForRow}
+        headerRowHeight={DEFAULT_HEIGHT}
+        onRowsChange={handleRowsChange}
+        onCellClick={handleCellClick}
+        onScroll={handleGridScroll}
+        enableVirtualization
+        className="fill-grid"
+        style={{ width: '100%', height: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+      />
+    </div>
   )
 }
