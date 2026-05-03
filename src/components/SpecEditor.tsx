@@ -5,14 +5,19 @@ import {
   useCallback,
   useMemo,
   useRef,
+  useState,
 } from 'react'
 import {
   DataGrid,
   renderTextEditor,
+  type CellKeyDownArgs,
+  type CellKeyboardEvent,
   type CellMouseArgs,
+  type CellSelectArgs,
   type Column,
   type ColumnWidths,
   type RenderCellProps,
+  type RenderEditCellProps,
 } from 'react-data-grid'
 import './SpecEditor.css'
 import type { YellowtailRow } from '../core/yellowtail-engine'
@@ -40,6 +45,9 @@ type SpecEditorProps = {
 }
 
 type GridRow = YellowtailRow & { __rowNumber: string }
+
+/** データ領域の選択セル（行・列は 0 起点）。列は行番号列を除くデータ列インデックス。 */
+export type SelectedCellCoords = { row: number; col: number }
 
 function toExcelColumnName(index: number): string {
   let current = index
@@ -106,6 +114,9 @@ export function SpecEditor({
   onRowHeightChange,
 }: SpecEditorProps) {
   const headers = columnHeaders
+
+  const [selectedCell, setSelectedCell] = useState<SelectedCellCoords | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
 
   const expandThrottleRef = useRef({ bottom: 0, right: 0 })
 
@@ -192,6 +203,42 @@ export function SpecEditor({
     [colWidths, headers, displayColCount, onColWidthsChange],
   )
 
+  const dataColumnIndex = useCallback(
+    (columnKey: string | unknown): number | null => {
+      const key = String(columnKey)
+      if (key === ROW_NUMBER_KEY) {
+        return null
+      }
+      const idx = headers.slice(0, displayColCount).indexOf(key)
+      return idx >= 0 ? idx : null
+    },
+    [headers, displayColCount],
+  )
+
+  const handleSelectedCellChange = useCallback(
+    (args: CellSelectArgs<GridRow>) => {
+      const { rowIdx, column } = args
+      const col = dataColumnIndex(column.key)
+      if (col === null) {
+        setSelectedCell(null)
+        return
+      }
+      setSelectedCell({ row: rowIdx, col })
+    },
+    [dataColumnIndex],
+  )
+
+  const wrapRenderEditCell = useCallback((props: RenderEditCellProps<GridRow>) => {
+    const { onClose } = props
+    return renderTextEditor({
+      ...props,
+      onClose: (commitChanges?: boolean, shouldFocusCell?: boolean) => {
+        setIsEditing(false)
+        onClose(commitChanges, shouldFocusCell)
+      },
+    })
+  }, [])
+
   const columns = useMemo<Column<GridRow>[]>(() => {
     const cellDivStyle = (colIndex: number) => {
       const w = colWidths.get(colIndex) ?? DEFAULT_WIDTH
@@ -259,10 +306,23 @@ export function SpecEditor({
       editable: true,
       resizable: true,
       width: colWidths.get(index) ?? DEFAULT_WIDTH,
-      renderEditCell: renderTextEditor,
-      renderCell: ({ row }: RenderCellProps<GridRow>) => (
-        <div style={cellDivStyle(index)}>{String(row[header] ?? '')}</div>
-      ),
+      renderEditCell: wrapRenderEditCell,
+      renderCell: ({ row, rowIdx }: RenderCellProps<GridRow>) => {
+        const at =
+          selectedCell !== null &&
+          selectedCell.row === rowIdx &&
+          selectedCell.col === index
+        const editingHere = isEditing && at
+        return (
+          <div
+            style={cellDivStyle(index)}
+            data-spec-selected={at ? 'true' : undefined}
+            data-spec-editing={editingHere ? 'true' : undefined}
+          >
+            {String(row[header] ?? '')}
+          </div>
+        )
+      },
     }))
 
     return [rowNumberColumn, ...editableColumns]
@@ -273,6 +333,9 @@ export function SpecEditor({
     handleRowResizePointerDown,
     handleRowResizePointerMove,
     endRowResize,
+    wrapRenderEditCell,
+    selectedCell,
+    isEditing,
   ])
 
   const gridRows = useMemo<GridRow[]>(() => {
@@ -328,11 +391,65 @@ export function SpecEditor({
     if (args.column.key === ROW_NUMBER_KEY) {
       return
     }
-
-    if (event.detail === 1) {
-      args.selectCell(true)
+    if (event.detail >= 2) {
+      return
     }
+    args.selectCell(false)
+    setIsEditing(false)
   }
+
+  const handleCellDoubleClick = (args: CellMouseArgs<GridRow>) => {
+    if (args.column.key === ROW_NUMBER_KEY) {
+      return
+    }
+    args.selectCell(true)
+    setIsEditing(true)
+  }
+
+  const handleCellKeyDown = useCallback(
+    (args: CellKeyDownArgs<GridRow>, event: CellKeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return
+      }
+      const ch = event.key.toLowerCase()
+      if (ch !== 'c' && ch !== 'v') {
+        return
+      }
+      if (args.mode === 'EDIT') {
+        return
+      }
+      if (args.mode !== 'SELECT') {
+        return
+      }
+      const { rowIdx, column } = args
+      const col = dataColumnIndex(column.key)
+      if (col === null) {
+        return
+      }
+
+      if (ch === 'c') {
+        event.preventGridDefault()
+        const text = data.get(makeCellKey(rowIdx, col)) ?? ''
+        void navigator.clipboard.writeText(text)
+        return
+      }
+
+      if (ch === 'v') {
+        event.preventGridDefault()
+        void navigator.clipboard.readText().then((text) => {
+          const next = new Map(data)
+          const sparseKey = makeCellKey(rowIdx, col)
+          if (text === '') {
+            next.delete(sparseKey)
+          } else {
+            next.set(sparseKey, text)
+          }
+          onCellDataChange?.(next)
+        })
+      }
+    },
+    [data, dataColumnIndex, onCellDataChange],
+  )
 
   if (headers.length === 0) {
     return <p>No table data found.</p>
@@ -349,7 +466,10 @@ export function SpecEditor({
         rowHeight={rowHeightForRow}
         headerRowHeight={DEFAULT_HEIGHT}
         onRowsChange={handleRowsChange}
+        onSelectedCellChange={handleSelectedCellChange}
         onCellClick={handleCellClick}
+        onCellDoubleClick={handleCellDoubleClick}
+        onCellKeyDown={handleCellKeyDown}
         onScroll={handleGridScroll}
         enableVirtualization
         className="fill-grid"

@@ -21,6 +21,20 @@
   box-sizing: border-box;
 }
 
+/*
+ * 通常セルは矢印（既定）カーソル＋テキスト選択なし（Excel 風）。
+ * 編集中のテキスト入力はカーソルをテキスト用に戻す。
+ */
+.fill-grid [role='gridcell'] {
+  cursor: default;
+  user-select: none;
+}
+
+.fill-grid input[class*='rdg-text-editor'] {
+  cursor: text;
+  user-select: text;
+}
+
 /* react-data-grid: widen column resize hit area at header boundaries */
 .fill-grid [class*='rdg-resize-handle'] {
   inline-size: 16px;
