@@ -19,7 +19,7 @@
     stroke-width="3.5"
     stroke-linecap="round"
     stroke-linejoin="round"
-    d="M 26 48 Q 54 40 88 50"
+    d="M 18 49 Q 36 41 54 48"
   />
   <circle cx="76" cy="48" r="3" fill="#fff" />
 </svg>
