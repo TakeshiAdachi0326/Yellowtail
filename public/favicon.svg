@@ -16,26 +16,10 @@
   <path
     fill="none"
     stroke="#FFD700"
-    stroke-width="3.2"
+    stroke-width="3.5"
     stroke-linecap="round"
     stroke-linejoin="round"
-    d="M 34 40 Q 54 34 78 42"
+    d="M 26 48 Q 54 40 88 50"
   />
-  <path
-    fill="none"
-    stroke="#FFD700"
-    stroke-width="3.2"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    d="M 32 50 Q 56 45 84 50"
-  />
-  <path
-    fill="none"
-    stroke="#FFD700"
-    stroke-width="3.2"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    d="M 34 60 Q 54 66 78 58"
-  />
-  <circle cx="76" cy="48" r="3.2" fill="#FFD700" />
+  <circle cx="76" cy="48" r="3" fill="#fff" />
 </svg>
