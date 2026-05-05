@@ -48,6 +48,13 @@ type SpecEditorProps = {
   /** 貼り付けで必要ならグリッド表示サイズを拡張（行・列の最小件数）。 */
   onEnsureDisplaySize?: (minRows: number, minCols: number) => void
   onRowHeightChange?: (rowIndex: number, heightPx: number) => void
+  /** セル編集以外（SELECT）で Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y */
+  undoRedo?: {
+    canUndo: boolean
+    canRedo: boolean
+    undo: () => void
+    redo: () => void
+  }
 }
 
 type GridRow = YellowtailRow & { __rowNumber: string }
@@ -181,6 +188,7 @@ export function SpecEditor({
   onExpandNearRight,
   onEnsureDisplaySize,
   onRowHeightChange,
+  undoRedo,
 }: SpecEditorProps) {
   const headers = columnHeaders
 
@@ -535,11 +543,26 @@ export function SpecEditor({
 
   const handleCellKeyDown = useCallback(
     (args: CellKeyDownArgs<GridRow>, event: CellKeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey)) {
+      const isMod = event.ctrlKey || event.metaKey
+      if (!isMod) {
         return
       }
-      const ch = event.key.toLowerCase()
-      if (ch !== 'c' && ch !== 'v' && ch !== 'x') {
+      const key = event.key.toLowerCase()
+
+      if (args.mode === 'SELECT' && undoRedo) {
+        if (key === 'z' && !event.shiftKey && undoRedo.canUndo) {
+          event.preventGridDefault()
+          undoRedo.undo()
+          return
+        }
+        if (((key === 'z' && event.shiftKey) || key === 'y') && undoRedo.canRedo) {
+          event.preventGridDefault()
+          undoRedo.redo()
+          return
+        }
+      }
+
+      if (key !== 'c' && key !== 'v' && key !== 'x') {
         return
       }
       if (args.mode === 'EDIT') {
@@ -549,6 +572,7 @@ export function SpecEditor({
         return
       }
 
+      const ch = key
       const { rowIdx, column } = args
       const colFromArgs = dataColumnIndex(column.key)
 
@@ -648,6 +672,7 @@ export function SpecEditor({
       onCellDataChange,
       onEnsureDisplaySize,
       selection,
+      undoRedo,
     ],
   )
 

@@ -20,6 +20,12 @@ type AppProps = {
   onEnsureDisplaySize: (minRows: number, minCols: number) => void
   onRowHeightChange: (rowIndex: number, heightPx: number) => void
   onSave: () => void
+  undoRedo?: {
+    canUndo: boolean
+    canRedo: boolean
+    undo: () => void
+    redo: () => void
+  }
 }
 
 function App({
@@ -39,6 +45,7 @@ function App({
   onEnsureDisplaySize,
   onRowHeightChange,
   onSave,
+  undoRedo,
 }: AppProps) {
   return (
     <main className="app-shell">
@@ -63,6 +70,7 @@ function App({
           onExpandNearRight={onExpandNearRight}
           onEnsureDisplaySize={onEnsureDisplaySize}
           onRowHeightChange={onRowHeightChange}
+          undoRedo={undoRedo}
         />
       </div>
 
