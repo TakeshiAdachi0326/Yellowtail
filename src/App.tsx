@@ -16,6 +16,8 @@ type AppProps = {
   onColWidthsChange: (next: Map<number, number>) => void
   onExpandNearBottom: () => void
   onExpandNearRight: () => void
+  /** 貼り付けなどで必要な表示行数・列数を確保（はみ出し分は拡張）。 */
+  onEnsureDisplaySize: (minRows: number, minCols: number) => void
   onRowHeightChange: (rowIndex: number, heightPx: number) => void
   onSave: () => void
 }
@@ -34,6 +36,7 @@ function App({
   onColWidthsChange,
   onExpandNearBottom,
   onExpandNearRight,
+  onEnsureDisplaySize,
   onRowHeightChange,
   onSave,
 }: AppProps) {
@@ -58,6 +61,7 @@ function App({
           onColWidthsChange={onColWidthsChange}
           onExpandNearBottom={onExpandNearBottom}
           onExpandNearRight={onExpandNearRight}
+          onEnsureDisplaySize={onEnsureDisplaySize}
           onRowHeightChange={onRowHeightChange}
         />
       </div>

@@ -16,8 +16,10 @@ import {
   type CellSelectArgs,
   type Column,
   type ColumnWidths,
+  type DataGridHandle,
   type RenderCellProps,
   type RenderEditCellProps,
+  type RenderHeaderCellProps,
 } from 'react-data-grid'
 import './SpecEditor.css'
 import type { YellowtailRow } from '../core/yellowtail-engine'
@@ -28,6 +30,8 @@ import {
   GRID_ROW_HEADER_COL_KEY,
   MIN_ROW_HEIGHT,
   makeCellKey,
+  matrixToTsv,
+  parseClipboardTsvToMatrix,
 } from '../core/cell-map'
 
 type SpecEditorProps = {
@@ -41,12 +45,76 @@ type SpecEditorProps = {
   onColWidthsChange?: (next: Map<number, number>) => void
   onExpandNearBottom?: () => void
   onExpandNearRight?: () => void
+  /** 貼り付けで必要ならグリッド表示サイズを拡張（行・列の最小件数）。 */
+  onEnsureDisplaySize?: (minRows: number, minCols: number) => void
   onRowHeightChange?: (rowIndex: number, heightPx: number) => void
 }
 
 type GridRow = YellowtailRow & { __rowNumber: string }
 
-/** データ領域の選択セル（行・列は 0 起点）。列は行番号列を除くデータ列インデックス。 */
+/** データ列・行は 0 起点（行番号「1〜」列・データ A 列は含まないインデックス）。 */
+export type GridSelection =
+  | { kind: 'cell'; row: number; col: number }
+  | { kind: 'column'; col: number }
+  | { kind: 'row'; row: number }
+  /** 矩形選択（次コミットで UI から設定予定）。端点は未正規化でも可。 */
+  | { kind: 'range'; row0: number; col0: number; row1: number; col1: number }
+
+type SelectionBounds = { row0: number; col0: number; row1: number; col1: number }
+
+function selectionToBounds(
+  sel: GridSelection,
+  displayRows: number,
+  displayCols: number,
+): SelectionBounds {
+  switch (sel.kind) {
+    case 'cell':
+      return { row0: sel.row, col0: sel.col, row1: sel.row, col1: sel.col }
+    case 'column':
+      return {
+        row0: 0,
+        col0: sel.col,
+        row1: Math.max(0, displayRows - 1),
+        col1: sel.col,
+      }
+    case 'row':
+      return {
+        row0: sel.row,
+        col0: 0,
+        row1: sel.row,
+        col1: Math.max(0, displayCols - 1),
+      }
+    case 'range':
+      return {
+        row0: Math.min(sel.row0, sel.row1),
+        col0: Math.min(sel.col0, sel.col1),
+        row1: Math.max(sel.row0, sel.row1),
+        col1: Math.max(sel.col0, sel.col1),
+      }
+  }
+}
+
+function boundsToTsv(data: Map<string, string>, b: SelectionBounds): string {
+  const rows: string[][] = []
+  for (let r = b.row0; r <= b.row1; r += 1) {
+    const line: string[] = []
+    for (let c = b.col0; c <= b.col1; c += 1) {
+      line.push(data.get(makeCellKey(r, c)) ?? '')
+    }
+    rows.push(line)
+  }
+  return matrixToTsv(rows)
+}
+
+function clearBoundsInMap(next: Map<string, string>, b: SelectionBounds) {
+  for (let r = b.row0; r <= b.row1; r += 1) {
+    for (let c = b.col0; c <= b.col1; c += 1) {
+      next.delete(makeCellKey(r, c))
+    }
+  }
+}
+
+/** @deprecated 互換用。`GridSelection` のセル選択と同じ形。 */
 export type SelectedCellCoords = { row: number; col: number }
 
 function toExcelColumnName(index: number): string {
@@ -111,13 +179,17 @@ export function SpecEditor({
   onColWidthsChange,
   onExpandNearBottom,
   onExpandNearRight,
+  onEnsureDisplaySize,
   onRowHeightChange,
 }: SpecEditorProps) {
   const headers = columnHeaders
 
-  const [selectedCell, setSelectedCell] = useState<SelectedCellCoords | null>(null)
+  const [selection, setSelection] = useState<GridSelection | null>(null)
   const [isEditing, setIsEditing] = useState(false)
 
+  const gridRef = useRef<DataGridHandle>(null)
+  /** 列見出し（A〜）クリック直後の `selectCell` で単一セル扱いに上書きされないようにする */
+  const columnHeaderSelectRef = useRef<number | null>(null)
   const expandThrottleRef = useRef({ bottom: 0, right: 0 })
 
   const handleGridScroll = useCallback(
@@ -218,12 +290,24 @@ export function SpecEditor({
   const handleSelectedCellChange = useCallback(
     (args: CellSelectArgs<GridRow>) => {
       const { rowIdx, column } = args
-      const col = dataColumnIndex(column.key)
-      if (col === null) {
-        setSelectedCell(null)
+      const dataCol = dataColumnIndex(column.key)
+      if (column.key === ROW_NUMBER_KEY) {
+        setSelection({ kind: 'row', row: rowIdx })
+        setIsEditing(false)
         return
       }
-      setSelectedCell({ row: rowIdx, col })
+      if (dataCol === null) {
+        setSelection(null)
+        return
+      }
+      const pendingCol = columnHeaderSelectRef.current
+      if (pendingCol !== null && dataCol === pendingCol) {
+        columnHeaderSelectRef.current = null
+        setSelection({ kind: 'column', col: pendingCol })
+        setIsEditing(false)
+        return
+      }
+      setSelection({ kind: 'cell', row: rowIdx, col: dataCol })
     },
     [dataColumnIndex],
   )
@@ -262,6 +346,7 @@ export function SpecEditor({
       renderCell: ({ row }: RenderCellProps<GridRow>) => {
         const rowIdx = Number(row.__rowNumber) - 1
         const w = colWidths.get(GRID_ROW_HEADER_COL_KEY) ?? DEFAULT_WIDTH
+        const rowSel = selection?.kind === 'row' && selection.row === rowIdx
         return (
           <div
             style={{
@@ -272,7 +357,15 @@ export function SpecEditor({
               display: 'flex',
               flexDirection: 'column',
               minHeight: 0,
+              ...(rowSel
+                ? {
+                    backgroundColor:
+                      'color-mix(in srgb, var(--rdg-selection-color, hsl(207 100% 50%)) 18%, transparent)',
+                  }
+                : {}),
             }}
+            data-spec-selected={rowSel ? 'true' : undefined}
+            data-spec-row-header-selected={rowSel ? 'true' : undefined}
           >
             <div
               style={{
@@ -306,17 +399,54 @@ export function SpecEditor({
       editable: true,
       resizable: true,
       width: colWidths.get(index) ?? DEFAULT_WIDTH,
+      renderHeaderCell: (headerProps: RenderHeaderCellProps<GridRow>) => (
+        <div
+          tabIndex={headerProps.tabIndex}
+          className="spec-column-header-label"
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest?.('[class*="rdg-resize-handle"]')) {
+              return
+            }
+            e.preventDefault()
+            e.stopPropagation()
+            columnHeaderSelectRef.current = index
+            setIsEditing(false)
+            setSelection({ kind: 'column', col: index })
+            queueMicrotask(() => {
+              gridRef.current?.selectCell({ rowIdx: 0, idx: index + 1 }, { shouldFocusCell: true })
+            })
+          }}
+        >
+          {toExcelColumnName(index)}
+        </div>
+      ),
       renderEditCell: wrapRenderEditCell,
       renderCell: ({ row, rowIdx }: RenderCellProps<GridRow>) => {
-        const at =
-          selectedCell !== null &&
-          selectedCell.row === rowIdx &&
-          selectedCell.col === index
-        const editingHere = isEditing && at
+        const cellSel = selection?.kind === 'cell' && selection.row === rowIdx && selection.col === index
+        const colSel = selection?.kind === 'column' && selection.col === index
+        const rowSel = selection?.kind === 'row' && selection.row === rowIdx
+        const rangeSel =
+          selection?.kind === 'range' &&
+          rowIdx >= Math.min(selection.row0, selection.row1) &&
+          rowIdx <= Math.max(selection.row0, selection.row1) &&
+          index >= Math.min(selection.col0, selection.col1) &&
+          index <= Math.max(selection.col0, selection.col1)
+        const highlighted = cellSel || colSel || rowSel || rangeSel
+        const editingHere = isEditing && cellSel
         return (
           <div
-            style={cellDivStyle(index)}
-            data-spec-selected={at ? 'true' : undefined}
+            style={{
+              ...cellDivStyle(index),
+              ...(highlighted
+                ? {
+                    backgroundColor:
+                      'color-mix(in srgb, var(--rdg-selection-color, hsl(207 100% 50%)) 18%, transparent)',
+                  }
+                : {}),
+            }}
+            data-spec-selected={highlighted ? 'true' : undefined}
+            data-spec-col-selected={colSel ? 'true' : undefined}
+            data-spec-row-selected={rowSel ? 'true' : undefined}
             data-spec-editing={editingHere ? 'true' : undefined}
           >
             {String(row[header] ?? '')}
@@ -334,7 +464,7 @@ export function SpecEditor({
     handleRowResizePointerMove,
     endRowResize,
     wrapRenderEditCell,
-    selectedCell,
+    selection,
     isEditing,
   ])
 
@@ -388,9 +518,6 @@ export function SpecEditor({
   }
 
   const handleCellClick = (args: CellMouseArgs<GridRow>, event: MouseEvent) => {
-    if (args.column.key === ROW_NUMBER_KEY) {
-      return
-    }
     if (event.detail >= 2) {
       return
     }
@@ -412,7 +539,7 @@ export function SpecEditor({
         return
       }
       const ch = event.key.toLowerCase()
-      if (ch !== 'c' && ch !== 'v') {
+      if (ch !== 'c' && ch !== 'v' && ch !== 'x') {
         return
       }
       if (args.mode === 'EDIT') {
@@ -421,34 +548,107 @@ export function SpecEditor({
       if (args.mode !== 'SELECT') {
         return
       }
+
       const { rowIdx, column } = args
-      const col = dataColumnIndex(column.key)
-      if (col === null) {
-        return
+      const colFromArgs = dataColumnIndex(column.key)
+
+      const copyBounds = (): SelectionBounds | null => {
+        if (selection !== null) {
+          return selectionToBounds(selection, displayRowCount, displayColCount)
+        }
+        if (colFromArgs === null) {
+          return null
+        }
+        return { row0: rowIdx, col0: colFromArgs, row1: rowIdx, col1: colFromArgs }
       }
 
-      if (ch === 'c') {
+      const pasteAnchor = (): { row: number; col: number } | null => {
+        if (!selection || selection.kind === 'cell') {
+          if (colFromArgs === null) {
+            return null
+          }
+          return { row: rowIdx, col: colFromArgs }
+        }
+        if (selection.kind === 'column') {
+          return { row: rowIdx, col: selection.col }
+        }
+        if (selection.kind === 'row') {
+          // 行選択時フォーカスは行番号列にあり colFromArgs は null。以前触った列の ref を使うと常に横ずれする。
+          // データ列にフォーカスがあるときは単一セル選択に降りるため、ここでは「行頭（0 列）」を既定にする。
+          return { row: selection.row, col: colFromArgs ?? 0 }
+        }
+        if (selection.kind === 'range') {
+          return {
+            row: Math.min(selection.row0, selection.row1),
+            col: Math.min(selection.col0, selection.col1),
+          }
+        }
+        return null
+      }
+
+      if (ch === 'c' || ch === 'x') {
+        const b = copyBounds()
+        if (!b) {
+          return
+        }
         event.preventGridDefault()
-        const text = data.get(makeCellKey(rowIdx, col)) ?? ''
-        void navigator.clipboard.writeText(text)
+        const tsv = boundsToTsv(data, b)
+        void navigator.clipboard.writeText(tsv)
+        if (ch === 'x') {
+          const next = new Map(data)
+          clearBoundsInMap(next, b)
+          onCellDataChange?.(next)
+        }
         return
       }
 
       if (ch === 'v') {
+        const anchor = pasteAnchor()
+        if (!anchor) {
+          return
+        }
         event.preventGridDefault()
         void navigator.clipboard.readText().then((text) => {
+          const matrix = parseClipboardTsvToMatrix(text)
+          const pasteRows = matrix.length
+          let pasteCols = 0
+          for (const row of matrix) {
+            pasteCols = Math.max(pasteCols, row.length)
+          }
+          if (pasteCols === 0) {
+            pasteCols = 1
+          }
+          const needRows = anchor.row + pasteRows
+          const needCols = anchor.col + pasteCols
+          onEnsureDisplaySize?.(needRows, needCols)
           const next = new Map(data)
-          const sparseKey = makeCellKey(rowIdx, col)
-          if (text === '') {
-            next.delete(sparseKey)
-          } else {
-            next.set(sparseKey, text)
+          for (let dr = 0; dr < pasteRows; dr += 1) {
+            const line = matrix[dr]
+            for (let dc = 0; dc < pasteCols; dc += 1) {
+              const v = line[dc] ?? ''
+              const r = anchor.row + dr
+              const c = anchor.col + dc
+              const k = makeCellKey(r, c)
+              if (v === '') {
+                next.delete(k)
+              } else {
+                next.set(k, v)
+              }
+            }
           }
           onCellDataChange?.(next)
         })
       }
     },
-    [data, dataColumnIndex, onCellDataChange],
+    [
+      data,
+      dataColumnIndex,
+      displayColCount,
+      displayRowCount,
+      onCellDataChange,
+      onEnsureDisplaySize,
+      selection,
+    ],
   )
 
   if (headers.length === 0) {
@@ -458,6 +658,7 @@ export function SpecEditor({
   return (
     <div className="spec-editor-viewport">
       <DataGrid
+        ref={gridRef}
         columns={columns}
         rows={gridRows}
         rowKeyGetter={(row) => row.__rowNumber}

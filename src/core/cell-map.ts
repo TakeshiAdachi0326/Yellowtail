@@ -51,6 +51,23 @@ export function makeCellKey(row: number, col: number): string {
   return `${row}-${col}`
 }
 
+/** クリップボード用 TSV（行＝改行、列＝タブ）。セル内改行は非対応（分割と両立しない）。 */
+export function parseClipboardTsvToMatrix(text: string): string[][] {
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = normalized.split('\n')
+  while (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop()
+  }
+  if (lines.length === 0) {
+    return [['']]
+  }
+  return lines.map((line) => line.split('\t'))
+}
+
+export function matrixToTsv(rows: string[][]): string {
+  return rows.map((r) => r.join('\t')).join('\n')
+}
+
 export function padColumnHeaders(existing: string[], displayCols: number): string[] {
   const out = existing.slice(0, displayCols)
   while (out.length < displayCols) {

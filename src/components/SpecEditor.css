@@ -35,6 +35,28 @@
   user-select: text;
 }
 
+/* A〜列: 見出しラベルクリックで縦列選択（リサイズハンドルは除外） */
+.spec-column-header-label {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  cursor: default;
+  user-select: none;
+}
+
+/*
+ * ヘッダ行の左端「#」セル（行番号列ヘッダ）は選択・クリックを抑止。
+ * 右端の列リサイズハンドルだけ操作可能にする。
+ */
+.fill-grid [role='row'] [role='columnheader']:first-child {
+  pointer-events: none;
+}
+
+.fill-grid [role='row'] [role='columnheader']:first-child [class*='rdg-resize-handle'] {
+  pointer-events: auto;
+}
+
 /* react-data-grid: widen column resize hit area at header boundaries */
 .fill-grid [class*='rdg-resize-handle'] {
   inline-size: 16px;

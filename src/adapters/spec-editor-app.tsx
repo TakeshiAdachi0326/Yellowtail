@@ -111,6 +111,15 @@ export function SpecEditorApp({
     setGridRowCount((n) => n + GRID_EXPAND_ROW_CHUNK)
   }
 
+  const handleEnsureDisplaySize = (minRows: number, minCols: number) => {
+    setGridRowCount((prev) => Math.max(prev, minRows))
+    setGridColCount((prev) => {
+      const next = Math.max(prev, minCols)
+      setColumnHeaders((h) => padColumnHeaders(h, next))
+      return next
+    })
+  }
+
   const handleRowHeightChange = (rowIndex: number, heightPx: number) => {
     setRowHeights((prev) => {
       const next = new Map(prev)
@@ -148,6 +157,7 @@ export function SpecEditorApp({
       onColWidthsChange={handleColWidthsChange}
       onExpandNearBottom={handleExpandNearBottom}
       onExpandNearRight={handleExpandNearRight}
+      onEnsureDisplaySize={handleEnsureDisplaySize}
       onRowHeightChange={handleRowHeightChange}
       onSave={handleSave}
     />
